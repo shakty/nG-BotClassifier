@@ -1,0 +1,347 @@
+---
+title: "Untitled"
+author: "Malte Söhren"
+date: "10/16/2020"
+output: html_document
+---
+# Loading Packages 
+
+```{r}
+library(tidyverse)
+library(DataExplorer)
+library(caret)
+library(caretEnsemble)
+library(pROC)
+library(gbm)
+library(data.table)
+library(superml)
+```
+
+```{r}
+setwd("/Users/2egaa/Desktop/BotorNot/")
+data_base <- read.csv("botornot-1.csv")
+```
+
+# Data Cleaning 
+
+Identify relevant variables on theoretical note 
+
+```{r}
+data <- data_base %>%  select(c(bot, overallTime, consentTime, readProfileTime, readEssayTime, speeder, superspeeder, quirk, age, birthday, birthmonth, gender, totlanguage, god, grownup_us, samestate, sametown, incomeclass, retake, session, disconnected, treatment, feedback, grownup_us, parentsdivorced, children, pets.0, military, gayfriends, incomebracket, income,  session))
+```
+
+Recode NA's in bot column as zeros 
+
+```{r}
+data$bot[is.na(data$bot)] <- 0
+data$bot[data$bot == 2] <- 1
+data$bot[data$bot == 3] <- 1
+
+data$bot <- as.factor(data$bot)
+
+data$bot <- factor(data$bot, levels=c(0,1), labels=c("No", "Yes"))
+data$speeder <- as.factor(data$speeder)
+data$superspeeder <- as.factor(data$superspeeder)
+data$retake <- as.factor(data$retake)
+```
+
+Remove NA Rows
+
+```{r}
+data <- data %>% na.omit()
+```
+
+Count words in quirk variable
+
+```{r}
+data <- data %>% mutate(quirk_count = sapply(gregexpr("\\S+", data$quirk), length), feedback_count = sapply(gregexpr("\\S+", data$feedback), length))
+
+```
+
+# Short summary
+
+```{r}
+data %>% group_by(bot) %>% 
+         summarize(overalltime = median(overallTime),
+                   consenttime = median(consentTime), 
+                   readProfileTime = median(readProfileTime), 
+                   readEssayTime = median(readEssayTime), 
+                   speeder = mean(as.numeric(speeder)), 
+                   superspeeder = mean(superspeeder), 
+                   quirk_count = mean(quirk_count),
+                   age = median(age))
+```
+
+# Some Plotting 
+
+```{r}
+ ggplot(data, aes(x = bot, y = consentTime)) + geom_boxplot(outlier.shape = NA) + scale_y_continuous(limits = quantile(data$consentTime, c(0.1, 0.9)))
+
+plotdata <- data %>% select(c(bot, consentTime, readProfileTime, readEssayTime, quirk_count, feedback_count, age))
+
+df.m <- melt(plotdata, id.var = "bot", factorsAsStrings=F)
+
+ggplot(data = df.m, aes(x=variable, y=value)) + geom_boxplot(aes(fill=bot)) + scale_y_continuous(limits = quantile(plotdata$consentTime, c(0.1, 0.9)))
+```
+
+# Some wrangeling and Bag of Words
+
+```{r}
+cv <- CountVectorizer$new(max_features = 300, remove_stopwords = FALSE)
+
+bow <- cv$fit_transform(data$feedback)
+
+bow <- as.data.frame(bow)
+
+modeldata <- bind_cols(data, bow)
+modeldata <- modeldata %>% select(-c(quirk, feedback...23))
+
+colnames(modeldata) <- make.names(colnames(modeldata))
+```
+
+# Setting up modeling 
+
+Split data into train & test set. Here, a 70/30 split is used to provide the test set with some more cases of the minority class (80/20-split would have resulted in only 14 cases which the model can be tested on)
+
+```{r}
+set.seed(92385)
+
+cdp <- createDataPartition(modeldata$bot, 
+                               p = .7, 
+                               list = FALSE, 
+                               times = 1)
+
+model_train <- modeldata[cdp,]
+model_test <- modeldata[-cdp,]
+```
+
+Defining the control object. Here, I am chossing 5-fold cross validation as well as SMOTE to create synthetic cases for the minority class.
+
+```{r}
+ctrl  <- trainControl(method = "cv", 
+                      number = 5,
+                      summaryFunction = twoClassSummary,
+                      verboseIter = TRUE,
+                      classProbs = TRUE,
+                      sampling = "smote",
+                      savePredictions = "final")
+```
+
+# Train models 
+
+## KNN 
+
+```{r}
+set.seed(28938)
+
+knn <- train(bot ~ .,
+             data = model_train,
+             method = "knn",
+             trControl = ctrl,
+             preProcess = c("center","scale"),
+             metric = "ROC")
+```
+
+```{r}
+p_knn <- predict(knn, model_test, type = "raw")
+confusionMatrix(p_knn, model_test$bot, mode = "everything", positive = "Yes")
+
+prob_knn <- predict(knn, model_test, type = "prob")
+```
+
+## Adaboost
+
+Train model
+
+```{r}
+set.seed(54637)
+
+ada <- train(bot ~ .,
+             data = model_train,
+             method = "ada",
+             trControl = ctrl,
+             metric = "ROC")
+```
+
+Predict 
+
+```{r}
+p_ada <- predict(ada, census_test, type = "raw")
+confusionMatrix(p_ada, census_test$bot, mode = "everything", positive = "Yes")
+```
+
+```{r}
+prob_ada <- predict(ada, newdata = census_test, type = "prob")
+prob_ada
+```
+
+# XGBoost 
+
+```{r}
+grid_xg <- expand.grid(max_depth = c(2, 3, 5),
+                    nrounds = c(100, 250),
+                    eta = c(0.05, 0.1, 0.3),
+                    min_child_weight = c(1, 2, 3),
+                    subsample = 0.7,
+                    gamma = c(0, 0.5),
+                    colsample_bytree = c(0.4, 1.0),
+                    subsample = c(0, 0.5))
+```
+
+```{r}
+set.seed(79647)
+xgb <- train(bot ~ .,
+             data = model_train,
+             method = "xgbTree",
+             trControl = ctrl,
+             tune = grid_xg,
+             metric = "ROC")
+
+#    nrounds max_depth eta gamma colsample_bytree min_child_weight
+#         50         3 0.4     0              0.8                1
+    subsample
+#           1
+```
+
+```{r}
+p_xgb <- predict(xgb, newdata = model_test, type = "raw")
+confusionMatrix(p_xgb, model_test$bot, mode = "everything", positive = "Yes")
+
+prob_xgb <- predict(xgb, newdata = model_test, type = "prob")
+round(prob_xgb, 2)
+
+```
+
+## C5.0
+
+```{r}
+set.seed(87543)
+
+c5 <- train(bot ~ .,
+            data = model_train,
+            method = "C5.0",
+            trControl = ctrl)
+```
+
+```{r}
+p_c5 <- predict(c5, model_test, type = "raw")
+confusionMatrix(p_c5, model_test$bot, mode = "everything", positive = "Yes")
+
+prob_c5 <- predict(c5, model_test, type = "prob")
+bind_cols(round(prob_c5, 2), model_test$bot)
+
+```
+
+## Extra-Trees 
+
+```{r}
+grid_et <- expand.grid(mtry = c(2,4,6, 8, 10, 12),
+                    splitrule = c("extratrees"),
+                    min.node.size = c(5,10,20))
+grid_et
+```
+
+```{r}
+set.seed(87543)
+et <- train(bot ~ .,
+            data = model_train,
+            method = "ranger",
+            trControl = ctrl,
+            tuneGrid = grid_et)
+```
+
+```{r}
+p_et <- predict(et, model_test, type = "raw")
+confusionMatrix(p_et, model_test$bot, mode = "everything", positive = "Yes")
+
+prob_et <- predict(et, model_test, type = "prob")
+
+```
+
+Creating ROC Objects. 
+
+```{r}
+xgb_roc <- roc(model_test$bot, prob_xgb$Yes)
+ada_roc <- roc(model_test$bot, prob_ada$Yes) 
+knn_roc <- roc(model_test$bot, prob_knn$Yes)
+c5_roc <- roc(model_test$bot, prob_c5$Yes)
+et_roc <- roc(model_test$bot, prob_et$Yes)
+ens_roc <- roc(model_test$bot, prob_ens$Yes)
+```
+
+Plotting ROC Objects. 
+
+```{r}
+ggroc(list(XGB = xgb_roc, 
+           C5.0 = c5_roc,
+           ExtraTrees = et_roc,
+           KNN = knn_roc)) +
+  geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1), 
+               color="darkgrey", linetype="dashed") +
+  theme(legend.title = element_blank())
+```
+
+
+Variablle Importance 
+
+```{r}
+gbmImp <- varImp(c5, scale = FALSE)
+plot(gbmImp)
+gbmImp
+```
+
+
+
+
+
+# Things I am trying out right now (Stacking models)
+
+```{r}
+model_list <- caretList(bot ~ .,
+                        data = model_train,
+                        trControl = ctrl,
+                        metric = "ROC",
+                        methodList = c("C5.0", "ranger", "gbm"))
+```
+
+```{r}
+glm_ensemble <- caretStack(model_list,
+                           method = "xgbTree",
+                           trControl = trainControl(
+                              method = "cv",
+                              number = 5,
+                              savePredictions = "final",
+                              verboseIter = TRUE,
+                              classProbs = TRUE,
+                              summaryFunction = twoClassSummary),
+                           tune = expand.grid(max_depth = c(2, 3, 5),
+                              nrounds = c(100, 250),
+                              eta = c(0.05, 0.1, 0.3),
+                              min_child_weight = c(1, 2, 3),
+                              subsample = 0.7,
+                              gamma = c(0, 0.5),
+                              colsample_bytree = c(0.4, 1.0),
+                              subsample = c(0, 0.5)))
+```
+
+```{r}
+glm_ensemble
+coef(glm_ensemble$ens_model$finalModel)
+```
+
+```{r}
+p_ens <- predict(glm_ensemble, newdata = model_test, type = "raw")
+confusionMatrix(p_ens, model_test$bot, mode = "everything", positive = "Yes")
+
+prob_ens <- predict(glm_ensemble, model_test, type = "prob")
+
+prob_et <- predict(et, model_test, type = "prob")
+
+```
+
+
+
+Start the tuning process.
+
+
+
