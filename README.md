@@ -23,7 +23,7 @@ A large challenge in this project is the high class imbalance in the target vari
 
 At the moment, models were trained (and tuned) with the following algorithms : KNN, Adaboost, XGB, ExtraTrees, C5.0. 
 
-XGB (<i> parameters: nrounds = 50, max_depth = 3, eta = 0.4 gamma = 0, colsample_bytree = 0.8, min_child_weight = 1, subsample = 1 </i>) currently performs the best out of all these models with <b> an Accuracy of 96% </b>. The model surpassed the no information rate which was pretty high (0.941) because of class imbalance. The Sensitivity is 0.82 & Specificity is 0.97 which means that the model accurately could identify 97% of non-bots, 82% of bots. One has to keep in mind that the model did not have many cases of bots so the Sensitivity could increase with more data. 
+XGB (<i> parameters: nrounds = 50, max_depth = 3, eta = 0.4 gamma = 0, colsample_bytree = 0.8, min_child_weight = 1, subsample = 1 </i>) currently performs the best out of all these models with an <b> Accuracy of 96% </b>. The model surpassed the no information rate which was pretty high (0.941) because of class imbalance. The Sensitivity is 0.82 & Specificity is 0.97 which means that the model accurately could identify 97% of non-bots, 82% of bots. One has to keep in mind that the model did not have many cases of bots so the Sensitivity could increase with more data. 
 
 ![Rplot04](https://user-images.githubusercontent.com/44944150/96366314-41d8a780-1147-11eb-81c9-e0108a9e1331.png)
 
