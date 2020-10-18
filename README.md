@@ -7,6 +7,10 @@ The goal of this project is to build a bot classifier that outputs probabilistic
 
 # Current Status 
 
+## Descriptive Analysis
+
+![Rplot03](https://user-images.githubusercontent.com/44944150/96366284-050cb080-1147-11eb-9ab5-42943e64a6a6.png)
+
 ## Feature selection
 
 Descriptive analysis showed strong differences in variables related to meta information of the user. Besides choosing these variables as features other variables were choosen (for now) out of theoretical intutiotn as well. The variable "feedback" was used to create further features. Using the Bag-of-words approach, the 300 most common words in these feedback answers were created as unique numeric. A word count variable which counts the amount of words written in the feedback variable was created as well since descriptive analysis showed that bots only write half as much words as non-bots.  
