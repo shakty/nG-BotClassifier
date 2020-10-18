@@ -29,7 +29,7 @@ XGB (<i> parameters: nrounds = 50, max_depth = 3, eta = 0.4 gamma = 0, colsample
 
 ## Output
 
-Below is the output of the model with the respective individual probabilites for identifying wheter the user was a bot or not (C1 No = Model says no, C2 Yes = Model says Yes; C3 Actual_Label = True label that was in the test set). One can see that the model performs quite well by providing mostly strong probabilites for yes or no. But what also can be seen is that the model has cases where it is completetly wrong (e.g. case 154). This could be improved with more data in the future. 
+Below is the output of the model with the respective individual probabilites for identifying wheter the user was a bot or not (C1 (No) = Model says no, C2 (Yes) = Model says Yes; C3 (Actual_Label) = True label that was in the test set). One can see that the model performs quite well by providing mostly strong probabilites for yes or no. But what also can be seen is that the model has cases where it is completetly wrong (e.g. case 154). This could be improved with more data in the future. 
 ```
     No   Yes  Actual_Label
 117 1.00 0.00           No
