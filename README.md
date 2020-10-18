@@ -1,8 +1,7 @@
-# nodeGame-BotClassifier
+# nG-BotClassifier
 
 # Description 
 
-This repository was created for the Seminar "Design and Implementation of Online Behavioral Experiments". 
 The goal of this project is to build a bot classifier that outputs probabilistic scores wheter a participant of a nodeGame survey is a bot or not. 
 
 # Current Status 
