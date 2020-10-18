@@ -9,11 +9,13 @@ The goal of this project is to build a bot classifier that outputs probabilistic
 
 ## Descriptive Analysis
 
+The first descriptive analysis shows that values for bots and non-bots in core variables are clearly different. For comparison, the age is also being shown here, at which this difference cannot be seen. quirk_count and feedback_count are variables that were derived from the quirk and feedback variables and count the sum of words in one answer. 
+
 ![Rplot03](https://user-images.githubusercontent.com/44944150/96366284-050cb080-1147-11eb-9ab5-42943e64a6a6.png)
 
 ## Feature selection
 
-Descriptive analysis showed strong differences in variables related to meta information of the user. Besides choosing these variables as features other variables were choosen (for now) out of theoretical intutiotn as well. The variable "feedback" was used to create further features. Using the Bag-of-words approach, the 300 most common words in these feedback answers were created as unique numeric. A word count variable which counts the amount of words written in the feedback variable was created as well since descriptive analysis showed that bots only write half as much words as non-bots.  
+Descriptive analysis showed strong differences in variables related to meta information of the user. Besides choosing these variables as features other variables were choosen (for now) out of theoretical intutiotn as well. The variable "feedback" was used to create further features. Using the Bag-of-words approach, the 300 most common words in these feedback answers were created as unique numeric variables. Further methods of feature extraction in relation to the string variables are currently investigated.
 
 ## Class Imbalance 
 
@@ -21,7 +23,7 @@ A large challenge in this project is the high class imbalance in the target vari
 
 ## Models
 
-At the moment, models were trained (and tuned) with the following algorithms : KNN, Adaboost, XGB, ExtraTrees, C5.0. 
+At the moment, models were trained (and tuned) with the following algorithms : KNN, XGB, ExtraTrees, C5.0. 
 
 XGB (<i> parameters: nrounds = 50, max_depth = 3, eta = 0.4 gamma = 0, colsample_bytree = 0.8, min_child_weight = 1, subsample = 1 </i>) currently performs the best out of all these models with an <b> Accuracy of 96% </b>. The model surpassed the no information rate which was pretty high (0.941) because of class imbalance. The Sensitivity is 0.82 & Specificity is 0.97 which means that the model accurately could identify 97% of non-bots, 82% of bots. One has to keep in mind that the model did not have many cases of bots so the Sensitivity could increase with more data. 
 
@@ -32,7 +34,7 @@ Prediction  No Yes
        Yes  11  18
 ```
 
-![Rplot04](https://user-images.githubusercontent.com/44944150/96366314-41d8a780-1147-11eb-81c9-e0108a9e1331.png)
+![Rplot05](https://user-images.githubusercontent.com/44944150/96371385-d0f2b900-1161-11eb-93b1-1cc5d2b4a257.png)
 
 ## Output
 
