@@ -1,67 +1,24 @@
 # nodeGame-BotClassifier
 
-```{r}
-library(tidyverse)
-library(DataExplorer)
-library(caret)
-library(caretEnsemble)
-library(pROC)
-library(gbm)
-library(data.table)
-library(superml)
-```
+# Description 
 
-```{r}
-setwd("/Users/2egaa/Desktop/BotorNot/")
-data_base <- read.csv("botornot-1.csv")
-```
+This repository was created for the Seminar "Design and Implementation of Online Behavioral Experiments". 
+The goal of this project is to build a bot classifier that outputs probabilistic scores wheter a participant of a nodeGame survey is a bot or not. 
 
-# Data Cleaning 
+# Current Status 
 
-Identify relevant variables on theoretical note 
+## Feature selection
 
-```{r}
-data <- data_base %>%  select(c(bot, overallTime, consentTime, readProfileTime, readEssayTime, speeder, superspeeder, quirk, age, birthday, birthmonth, gender, totlanguage, god, grownup_us, samestate, sametown, incomeclass, retake, session, disconnected, treatment, feedback, grownup_us, parentsdivorced, children, pets.0, military, gayfriends, incomebracket, income,  session))
-```
+Descriptive analysis showed strong differences in variables related to meta information of the user. Besides choosing these variables as features other variables were choosen (for now) out of theoretical intutiotn as well. The variable "feedback" was used to create further features. Using the Bag-of-words approach, the 300 most common words in these feedback answers were created as unique numeric. A word count variable which counts the amount of words written in the feedback variable was created as well since descriptive analysis showed that bots only write half as much words as non-bots.  
 
-Recode NA's in bot column as zeros 
+## Class Imbalance 
 
-```{r}
-data$bot[is.na(data$bot)] <- 0
-data$bot[data$bot == 2] <- 1
-data$bot[data$bot == 3] <- 1
+A large challenge in this project is the high class imbalance in the target variable. Only 6 % of the instances in this data are labeled as bots and therefore training and testing the model is difficult. Class Imbalance was handled by creating synthetic data in the training set with SMOTE (Chawla, N. V. and Bowyer, K. W. and Hall, L. O. and Kegelmeyer, W. P., "{SMOTE}: synthetic minority over-sampling technique" , Journal of Artificial Intelligence Research, 2002, pp. 321--357). 
 
-data$bot <- as.factor(data$bot)
+## Models
 
-data$bot <- factor(data$bot, levels=c(0,1), labels=c("No", "Yes"))
-data$speeder <- as.factor(data$speeder)
-data$superspeeder <- as.factor(data$superspeeder)
-data$retake <- as.factor(data$retake)
-```
+At the moment, models were trained (and tuned) with the following algorithms : KNN, Adaboost, XGB, ExtraTrees, C5.0. 
 
-Remove NA Rows
+XGB (<i> parameters: nrounds = 50, max_depth = 3, eta = 0.4 gamma = 0, colsample_bytree = 0.8, min_child_weight = 1, subsample = 1 </i>) currently performs the best out of all these models with <b> Accuracy of 96% </b> (Sensitivity = 0.82; Specificity = 0.97). That means that the model accurately could identify 97%, 82% of bots and therefore surpassed the no information rate which was pretty high (0.941) because of class imbalance. One has to keep in mind that the model did not have many cases of bots so Sensitivity could increase with more data. 
 
-```{r}
-data <- data %>% na.omit()
-```
-
-Count words in quirk variable
-
-```{r}
-data <- data %>% mutate(quirk_count = sapply(gregexpr("\\S+", data$quirk), length), feedback_count = sapply(gregexpr("\\S+", data$feedback), length))
-
-```
-
-
-```{r}
-data %>% group_by(bot) %>% 
-         summarize(overalltime = mean(overallTime),
-                   consenttime = mean(consentTime), 
-                   readProfileTime = mean(readProfileTime), 
-                   readEssayTime = mean(readEssayTime), 
-                   speeder = mean(speeder), 
-                   superspeeder = mean(superspeeder), 
-                   quirk_count = mean(quirk_count),
-                   age = median(age))
-```
 
