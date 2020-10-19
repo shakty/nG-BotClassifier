@@ -14,7 +14,7 @@ The first descriptive analysis shows that values for bots and non-bots in core v
 
 ## Feature selection
 
-Descriptive analysis showed strong differences in variables related to meta information of the user. Besides choosing these variables as features other variables were choosen (for now) out of theoretical intutiotn as well. The variable "feedback" was used to create further features. Using the Bag-of-words approach, the 300 most common words in these feedback answers were created as unique numeric variables. Further methods of feature extraction in relation to the string variables are currently investigated.
+Descriptive analysis showed strong differences in variables related to meta information of the user. Besides choosing these variables as features other variables were choosen (for now) out of theoretical intuition as well. The variable "feedback" was used to create further features. Using the Bag-of-words approach, the 300 most common words in these feedback answers were created as unique numeric variables. Further methods of feature extraction in relation to the string variables are currently investigated.
 
 ## Class Imbalance 
 
