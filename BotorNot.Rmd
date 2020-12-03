@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "Botornot"
 author: "Malte Söhren"
 date: "10/16/2020"
 output: html_document
@@ -72,10 +72,10 @@ data %>% group_by(bot) %>%
                    age = median(age))
 ```
 
-# Some Plotting 
+# Plotting differences
 
 ```{r}
- ggplot(data, aes(x = bot, y = consentTime)) + geom_boxplot(outlier.shape = NA) + scale_y_continuous(limits = quantile(data$consentTime, c(0.1, 0.9)))
+ggplot(data, aes(x = bot, y = consentTime)) + geom_boxplot(outlier.shape = NA) + scale_y_continuous(limits = quantile(data$consentTime, c(0.1, 0.9)))
 
 plotdata <- data %>% select(c(bot, consentTime, readProfileTime, readEssayTime, quirk_count, feedback_count, age))
 
@@ -84,10 +84,10 @@ df.m <- melt(plotdata, id.var = "bot", factorsAsStrings=F)
 ggplot(data = df.m, aes(x=variable, y=value)) + geom_boxplot(aes(fill=bot)) + scale_y_continuous(limits = quantile(plotdata$consentTime, c(0.1, 0.9)))
 ```
 
-# Some wrangeling and Bag of Words
+# Bag of Words
 
 ```{r}
-cv <- CountVectorizer$new(max_features = 300, remove_stopwords = FALSE)
+cv <- CountVectorizer$new(max_features = 300, remove_stopwords = FALSE, lowercase = TRUE)
 
 bow <- cv$fit_transform(data$feedback)
 
@@ -104,7 +104,7 @@ colnames(modeldata) <- make.names(colnames(modeldata))
 Split data into train & test set. Here, a 70/30 split is used to provide the test set with some more cases of the minority class (80/20-split would have resulted in only 14 cases which the model can be tested on)
 
 ```{r}
-set.seed(92385)
+set.seed(92381)
 
 cdp <- createDataPartition(modeldata$bot, 
                                p = .7, 
@@ -149,43 +149,17 @@ confusionMatrix(p_knn, model_test$bot, mode = "everything", positive = "Yes")
 prob_knn <- predict(knn, model_test, type = "prob")
 ```
 
-## Adaboost
-
-Train model
-
-```{r}
-set.seed(54637)
-
-ada <- train(bot ~ .,
-             data = model_train,
-             method = "ada",
-             trControl = ctrl,
-             metric = "ROC")
-```
-
-Predict 
-
-```{r}
-p_ada <- predict(ada, census_test, type = "raw")
-confusionMatrix(p_ada, census_test$bot, mode = "everything", positive = "Yes")
-```
-
-```{r}
-prob_ada <- predict(ada, newdata = census_test, type = "prob")
-prob_ada
-```
 
 # XGBoost 
 
 ```{r}
-grid_xg <- expand.grid(max_depth = c(2, 3, 5),
-                    nrounds = c(100, 250),
-                    eta = c(0.05, 0.1, 0.3),
-                    min_child_weight = c(1, 2, 3),
-                    subsample = 0.7,
+grid_xg <- expand.grid(max_depth = c(2, 3),
+                    nrounds = c(50, 100),
+                    eta = c(0.4),
+                    min_child_weight = c(1, 2),
                     gamma = c(0, 0.5),
                     colsample_bytree = c(0.4, 1.0),
-                    subsample = c(0, 0.5))
+                    subsample = c(0, 1))
 ```
 
 ```{r}
@@ -194,13 +168,8 @@ xgb <- train(bot ~ .,
              data = model_train,
              method = "xgbTree",
              trControl = ctrl,
-             tune = grid_xg,
+             tuneGrid = grid_xg,
              metric = "ROC")
-
-#    nrounds max_depth eta gamma colsample_bytree min_child_weight
-#         50         3 0.4     0              0.8                1
-    subsample
-#           1
 ```
 
 ```{r}
@@ -209,7 +178,6 @@ confusionMatrix(p_xgb, model_test$bot, mode = "everything", positive = "Yes")
 
 prob_xgb <- predict(xgb, newdata = model_test, type = "prob")
 round(prob_xgb, 2)
-
 ```
 
 ## C5.0
@@ -262,11 +230,9 @@ Creating ROC Objects.
 
 ```{r}
 xgb_roc <- roc(model_test$bot, prob_xgb$Yes)
-ada_roc <- roc(model_test$bot, prob_ada$Yes) 
 knn_roc <- roc(model_test$bot, prob_knn$Yes)
 c5_roc <- roc(model_test$bot, prob_c5$Yes)
 et_roc <- roc(model_test$bot, prob_et$Yes)
-ens_roc <- roc(model_test$bot, prob_ens$Yes)
 ```
 
 Plotting ROC Objects. 
@@ -282,16 +248,13 @@ ggroc(list(XGB = xgb_roc,
 ```
 
 
-Variablle Importance 
+Variable Importance 
 
 ```{r}
 gbmImp <- varImp(c5, scale = FALSE)
 plot(gbmImp)
 gbmImp
 ```
-
-
-
 
 
 # Things I am trying out right now (Stacking models)
@@ -301,27 +264,19 @@ model_list <- caretList(bot ~ .,
                         data = model_train,
                         trControl = ctrl,
                         metric = "ROC",
-                        methodList = c("C5.0", "ranger", "gbm"))
+                        methodList = c("C5.0", "gbm"))
 ```
 
 ```{r}
 glm_ensemble <- caretStack(model_list,
-                           method = "xgbTree",
+                           method = "ranger",
                            trControl = trainControl(
                               method = "cv",
                               number = 5,
                               savePredictions = "final",
                               verboseIter = TRUE,
                               classProbs = TRUE,
-                              summaryFunction = twoClassSummary),
-                           tune = expand.grid(max_depth = c(2, 3, 5),
-                              nrounds = c(100, 250),
-                              eta = c(0.05, 0.1, 0.3),
-                              min_child_weight = c(1, 2, 3),
-                              subsample = 0.7,
-                              gamma = c(0, 0.5),
-                              colsample_bytree = c(0.4, 1.0),
-                              subsample = c(0, 0.5)))
+                              summaryFunction = twoClassSummary))
 ```
 
 ```{r}
@@ -341,7 +296,9 @@ prob_et <- predict(et, model_test, type = "prob")
 
 
 
-Start the tuning process.
+
+
+
 
 
 
