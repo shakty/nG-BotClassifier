@@ -1,0 +1,107 @@
+---
+title: "GloVe"
+author: "Malte Söhren"
+date: "12/10/2020"
+output: html_document
+---
+
+```{r}
+library(keras)
+library(dplyr)
+```
+
+```{r}
+setwd("/Users/2egaa/Desktop/BotorNot/")
+data <- read.csv("botornot-1.csv")
+```
+
+```{r}
+data_glove <- data %>% select(c(bot, feedback))
+```
+
+```{r}
+data_glove$bot[is.na(data_glove$bot)] <- 0
+data_glove$bot[data_glove$bot == 2] <- 1
+data_glove$bot[data_glove$bot == 3] <- 1
+
+data_glove$bot <- as.integer(data_glove$bot)
+```
+
+```{r}
+if (!file.exists('glove.6B.zip')) {
+  download.file('http://nlp.stanford.edu/data/glove.6B.zip',destfile = 'glove.6B.zip')
+  unzip('glove.6B.zip')
+}
+```
+
+```{r}
+vectors <- data.table::fread('glove.6B.300d.txt', data.table = F,  encoding = 'UTF-8')
+colnames(vectors) = c('word',paste('dim',1:300,sep = '_'))
+```
+
+```{r}
+as_tibble(vectors)
+```
+
+```{r}
+max_words = 1e4
+maxlen = 60
+dim_size = 300
+```
+
+```{r}
+word_seqs <- text_tokenizer(num_words = max_words) %>%
+  fit_text_tokenizer(data_glove$feedback)
+```
+
+```{r}
+x_train <- texts_to_sequences(word_seqs, data_glove$feedback) %>%
+  pad_sequences( maxlen = maxlen)
+```
+
+```{r}
+y_train <- as.matrix(data_glove$bot)
+word_indices <- unlist(word_seqs$word_index)
+```
+
+```{r}
+dic <- data.frame(word = names(word_indices), key = word_indices, stringsAsFactors = FALSE) %>%
+  arrange(key) %>% .[1:max_words,]
+```
+
+```{r}
+word_embeds <- dic  %>% left_join(vectors) %>% .[,3:302] %>% replace(., is.na(.), 0) %>% as.matrix()
+```
+
+```{r}
+input <- layer_input(shape = list(maxlen), name = "input")
+
+model <- input %>%
+  layer_embedding(input_dim = max_words, output_dim = dim_size, input_length = maxlen,
+                  weights = list(word_embeds), trainable = FALSE) %>%
+  layer_spatial_dropout_1d(rate = 0.2 ) %>%
+  bidirectional(
+    layer_gru(units = 80, return_sequences = TRUE)
+  )
+max_pool <- model %>% layer_global_max_pooling_1d()
+ave_pool <- model %>% layer_global_average_pooling_1d()
+
+output = layer_concatenate(list(ave_pool, max_pool)) %>%
+  layer_dense(units = 1, activation = "sigmoid")
+
+model <- keras_model(input, output)
+
+model %>% compile(
+  optimizer = "adam",
+  loss = "binary_crossentropy",
+  metrics = tensorflow::tf$keras$metrics$AUC()
+)
+
+history <- model %>% keras::fit(
+  x_train, y_train,
+  epochs = 16,
+  batch_size = 32,
+  validation_split = 0.2
+)
+```
+
