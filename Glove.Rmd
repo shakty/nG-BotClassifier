@@ -16,7 +16,9 @@ data <- read.csv("botornot-1.csv")
 ```
 
 ```{r}
-data_glove <- data %>% select(c(bot, feedback))
+data_glove <- data %>% select(c(bot, feedback, quirk))
+data_glove$feedback <- as.character(data_glove$feedback)
+data_glove$text <- do.call(paste0, data_glove[2:3])
 ```
 
 ```{r}
@@ -25,6 +27,8 @@ data_glove$bot[data_glove$bot == 2] <- 1
 data_glove$bot[data_glove$bot == 3] <- 1
 
 data_glove$bot <- as.integer(data_glove$bot)
+data_train <- data_glove[1:1200,]
+data_test <- data_glove[1201:1351,]
 ```
 
 ```{r}
@@ -51,16 +55,16 @@ dim_size = 300
 
 ```{r}
 word_seqs <- text_tokenizer(num_words = max_words) %>%
-  fit_text_tokenizer(data_glove$feedback)
+  fit_text_tokenizer(data_train$text)
 ```
 
 ```{r}
-x_train <- texts_to_sequences(word_seqs, data_glove$feedback) %>%
+x_train <- texts_to_sequences(word_seqs, data_train$text) %>%
   pad_sequences( maxlen = maxlen)
 ```
 
 ```{r}
-y_train <- as.matrix(data_glove$bot)
+y_train <- as.matrix(data_train$bot)
 word_indices <- unlist(word_seqs$word_index)
 ```
 
@@ -104,4 +108,25 @@ history <- model %>% keras::fit(
   validation_split = 0.2
 )
 ```
+
+```{r}
+x_test <- texts_to_sequences(word_seqs, data_test$text) %>%
+  pad_sequences( maxlen = maxlen)
+
+y_test <- as.matrix(data_test$text)
+
+pred <- model %>% predict(x_test)
+format(round(pred, 2), scientific = FALSE)
+```
+
+```{r}
+model %>% evaluate(x_test, y_test, verbose = 0)
+```
+
+```{r}
+newdf <- data.frame(probabilites = format(round(pred, 2)), bot = data_test$bot)
+newdf
+```
+
+
 
