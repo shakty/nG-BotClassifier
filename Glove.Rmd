@@ -66,7 +66,7 @@ dim_size = 300
 ```
 
 ```{r}
-word_seqs <- text_tokenizer(num_words = max_words) %>%
+word_seqs <- text_tokenizer(num_words = max_words) %>% 
   fit_text_tokenizer(data_train$text)
 ```
 
@@ -125,11 +125,17 @@ history <- model %>% keras::fit(
 x_test <- texts_to_sequences(word_seqs, data_test$text) %>%
   pad_sequences( maxlen = maxlen)
 
-y_test <- as.matrix(data_test$text)
+y_test <- as.matrix(data_test$bot)
+```
 
+Make predictions with data from testset. 
+
+```{r}
 pred <- model %>% predict(x_test)
 format(round(pred, 2), scientific = FALSE)
 ```
+
+Evaluate performance. 
 
 ```{r}
 model %>% evaluate(x_test, y_test, verbose = 0)
