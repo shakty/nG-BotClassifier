@@ -128,5 +128,6 @@ newdf <- data.frame(probabilites = format(round(pred, 2)), bot = data_test$bot)
 newdf
 ```
 
-
-
+```{r}
+View(newdf)
+```
