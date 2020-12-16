@@ -5,26 +5,48 @@ date: "12/16/2020"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# Loading Packages 
+
+```{r}
+library(tidyverse)
+library(DataExplorer)
+library(caret)
+library(caretEnsemble)
+library(pROC)
+library(gbm)
+library(data.table)
+library(superml)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+setwd("/Users/2egaa/Desktop/ng-BotClassifier/")
+data_base <- read.csv("overview_labels.csv")
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+data <- data_base %>%  select(c("bot", "freetext",  "ratioIneqUS",   "avgTime.min",    "outRatio",    "speeder", "time_1.1.1", "time_1.2.1", "time_2.1.1", "time_2.2.1", "time_2.3.1", "time_feedback", "time_feedback", "prol.prolific_score", "feedback"))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+data$bot[is.na(data$bot)] <- 0
+data$bot[data$bot == 2] <- 1
+data$bot[data$bot == 3] <- 1
+
+data$bot <- as.factor(data$bot)
+
+data$bot <- factor(data$bot, levels=c(0,1), labels=c("No", "Yes"))
+data$speeder <- as.factor(data$speeder)
+data$superspeeder <- as.factor(data$superspeeder)
+data$retake <- as.factor(data$retake)
+```
+
+```{r}
+data <- data %>% na.omit()
+```
+
+```{r}
+data_glove_2 <- data %>% select(c(bot, feedback, quirk))
+data_glove_2$feedback <- as.character(data_glove_2$feedback)
+data_glove_2$text <- do.call(paste0, data_glove_2[2:3])
+data_glove_2$bot <- as.integer(data_glove_2$bot)
+```
