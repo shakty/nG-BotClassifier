@@ -15,11 +15,12 @@ library(pROC)
 library(gbm)
 library(data.table)
 library(superml)
+library(keras)
 ```
 
 ```{r}
-setwd("/Users/2egaa/Desktop/BotorNot/")
-data_base <- read.csv("botornot-1.csv")
+setwd("/Users/2egaa/Desktop/nG-BotClassifier")
+data <- read.csv("botornot-1.csv")
 ```
 
 # Data Cleaning 
@@ -27,41 +28,40 @@ data_base <- read.csv("botornot-1.csv")
 Identify relevant variables on theoretical note 
 
 ```{r}
-data <- data_base %>%  select(c(bot, overallTime, consentTime, readProfileTime, readEssayTime, speeder, superspeeder, quirk, age, birthday, birthmonth, gender, totlanguage, god, grownup_us, samestate, sametown, incomeclass, retake, session, disconnected, treatment, feedback, grownup_us, parentsdivorced, children, pets.0, military, gayfriends, incomebracket, income,  session))
+data_base <-data %>%  select(c(bot, overallTime, consentTime, readProfileTime, readEssayTime, speeder, superspeeder, quirk, age, birthday, birthmonth, gender, totlanguage, god, grownup_us, samestate, sametown, incomeclass, retake, session, disconnected, treatment, feedback, grownup_us, parentsdivorced, children, pets.0, military, gayfriends, incomebracket, income, session))
 ```
 
 Recode NA's in bot column as zeros 
 
 ```{r}
-data$bot[is.na(data$bot)] <- 0
-data$bot[data$bot == 2] <- 1
-data$bot[data$bot == 3] <- 1
+data_base$bot[is.na(data_base$bot)] <- 0
+data_base$bot[data_base$bot == 2] <- 1
+data_base$bot[data_base$bot == 3] <- 1
 
-data$bot <- as.factor(data$bot)
+data_base$bot <- as.factor(data_base$bot)
 
-data$bot <- factor(data$bot, levels=c(0,1), labels=c("No", "Yes"))
-data$speeder <- as.factor(data$speeder)
-data$superspeeder <- as.factor(data$superspeeder)
-data$retake <- as.factor(data$retake)
+data_base$bot <- factor(data_base$bot, levels=c(0,1), labels=c("No", "Yes"))
+data_base$speeder <- as.factor(data_base$speeder)
+data_base$superspeeder <- as.factor(data_base$superspeeder)
+data_base$retake <- as.factor(data_base$retake)
 ```
 
 Remove NA Rows
 
 ```{r}
-data <- data %>% na.omit()
+data_clean <- data_base %>% na.omit()
 ```
 
 Count words in quirk variable
 
 ```{r}
-data <- data %>% mutate(quirk_count = sapply(gregexpr("\\S+", data$quirk), length), feedback_count = sapply(gregexpr("\\S+", data$feedback), length))
-
+data_clean <- data_clean %>% mutate(quirk_count = sapply(gregexpr("\\S+", data$quirk), length), feedback_count = sapply(gregexpr("\\S+", data_clean$feedback), length))
 ```
 
 # Short summary
 
 ```{r}
-data %>% group_by(bot) %>% 
+data_clean %>% group_by(bot) %>% 
          summarize(overalltime = median(overallTime),
                    consenttime = median(consentTime), 
                    readProfileTime = median(readProfileTime), 
@@ -75,9 +75,9 @@ data %>% group_by(bot) %>%
 # Plotting differences
 
 ```{r}
-ggplot(data, aes(x = bot, y = consentTime)) + geom_boxplot(outlier.shape = NA) + scale_y_continuous(limits = quantile(data$consentTime, c(0.1, 0.9)))
+ggplot(data_clean, aes(x = bot, y = consentTime)) + geom_boxplot(outlier.shape = NA) + scale_y_continuous(limits = quantile(data$consentTime, c(0.1, 0.9)))
 
-plotdata <- data %>% select(c(bot, consentTime, readProfileTime, readEssayTime, quirk_count, feedback_count, age))
+plotdata <- data_clean %>% select(c(bot, consentTime, readProfileTime, readEssayTime, quirk_count, feedback_count, age))
 
 df.m <- melt(plotdata, id.var = "bot", factorsAsStrings=F)
 
@@ -89,11 +89,11 @@ ggplot(data = df.m, aes(x=variable, y=value)) + geom_boxplot(aes(fill=bot)) + sc
 ```{r}
 cv <- CountVectorizer$new(max_features = 300, remove_stopwords = FALSE, lowercase = TRUE)
 
-bow <- cv$fit_transform(data$feedback)
+bow <- cv$fit_transform(data_clean$feedback)
 
 bow <- as.data.frame(bow)
 
-modeldata <- bind_cols(data, bow)
+modeldata <- bind_cols(data_clean, bow)
 modeldata <- modeldata %>% select(-c(quirk, feedback...23))
 
 colnames(modeldata) <- make.names(colnames(modeldata))
@@ -156,7 +156,7 @@ prob_knn <- predict(knn, model_test, type = "prob")
 grid_xg <- expand.grid(max_depth = c(2, 3),
                     nrounds = c(50, 100),
                     eta = c(0.4),
-                    min_child_weight = c(1, 2),
+                    min_child_weight = c(1,2),
                     gamma = c(0, 0.5),
                     colsample_bytree = c(0.4, 1.0),
                     subsample = c(0, 1))
@@ -206,7 +206,6 @@ bind_cols(round(prob_c5, 2), model_test$bot)
 grid_et <- expand.grid(mtry = c(2,4,6, 8, 10, 12),
                     splitrule = c("extratrees"),
                     min.node.size = c(5,10,20))
-grid_et
 ```
 
 ```{r}
@@ -223,7 +222,6 @@ p_et <- predict(et, model_test, type = "raw")
 confusionMatrix(p_et, model_test$bot, mode = "everything", positive = "Yes")
 
 prob_et <- predict(et, model_test, type = "prob")
-
 ```
 
 Creating ROC Objects. 
@@ -233,6 +231,7 @@ xgb_roc <- roc(model_test$bot, prob_xgb$Yes)
 knn_roc <- roc(model_test$bot, prob_knn$Yes)
 c5_roc <- roc(model_test$bot, prob_c5$Yes)
 et_roc <- roc(model_test$bot, prob_et$Yes)
+history
 ```
 
 Plotting ROC Objects. 
@@ -247,52 +246,162 @@ ggroc(list(XGB = xgb_roc,
   theme(legend.title = element_blank())
 ```
 
+##### GloVe Model ########
 
-Variable Importance 
+Select relevant variables and merge text variables. 
 
 ```{r}
-gbmImp <- varImp(c5, scale = FALSE)
-plot(gbmImp)
-gbmImp
+data_glove <- data %>% select(c(bot, feedback))
+data_glove$feedback <- as.character(data_glove$feedback)
+```
+
+Clean-up bot variable.
+
+```{r}
+data_glove$bot[is.na(data_glove$bot)] <- 0
+data_glove$bot[data_glove$bot == 2] <- 1
+data_glove$bot[data_glove$bot == 3] <- 1
+data_glove$bot <- as.integer(data_glove$bot)
+```
+
+Create train & test dataset. 
+
+```{r}
+data_train <- data_glove[1:1200,]
+data_test <- data_glove[1201:1351,]
+```
+
+Run only if pre_trained vectors are not downloaded yet. 
+
+```{r eval=FALSE, include=FALSE}
+if (!file.exists('glove.6B.zip')) {
+  download.file('http://nlp.stanford.edu/data/glove.6B.zip',destfile = 'glove.6B.zip')
+  unzip('glove.6B.zip')
+}
+```
+
+Read in vectors. 
+
+```{r}
+vectors <- data.table::fread('glove.6B.300d.txt', data.table = F,  encoding = 'UTF-8')
+colnames(vectors) = c('word',paste('dim',1:300,sep = '_'))
+
+as_tibble(vectors)
+```
+
+Set parameters.
+
+```{r}
+max_words = 1e4
+maxlen = 60
+dim_size = 300
+```
+
+```{r}
+word_seqs <- text_tokenizer(num_words = max_words) %>% 
+  fit_text_tokenizer(data_train$feedback)
+```
+
+```{r}
+x_train <- texts_to_sequences(word_seqs, data_train$text) %>%
+  pad_sequences( maxlen = maxlen)
+```
+
+```{r}
+y_train <- as.matrix(data_train$bot)
+word_indices <- unlist(word_seqs$word_index)
+```
+
+```{r}
+dic <- data.frame(word = names(word_indices), key = word_indices, stringsAsFactors = FALSE) %>%
+  arrange(key) %>% .[1:max_words,]
+```
+
+```{r}
+word_embeds <- dic  %>% left_join(vectors) %>% .[,3:302] %>% replace(., is.na(.), 0) %>% as.matrix()
+```
+
+```{r}
+input <- layer_input(shape = list(maxlen), name = "input")
+
+model <- input %>%
+  layer_embedding(input_dim = max_words, output_dim = dim_size, input_length = maxlen,
+                  weights = list(word_embeds), trainable = FALSE) %>%
+  layer_spatial_dropout_1d(rate = 0.2 ) %>%
+  bidirectional(
+    layer_gru(units = 80, return_sequences = TRUE)
+  )
+max_pool <- model %>% layer_global_max_pooling_1d()
+ave_pool <- model %>% layer_global_average_pooling_1d()
+
+output = layer_concatenate(list(ave_pool, max_pool)) %>%
+  layer_dense(units = 1, activation = "sigmoid")
+
+model <- keras_model(input, output)
+
+model %>% compile(
+  optimizer = "adam",
+  loss = "binary_crossentropy",
+  metrics = tensorflow::tf$keras$metrics$AUC()
+)
+
+history <- model %>% keras::fit(
+  x_train, y_train,
+  epochs = 16,
+  batch_size = 32,
+  validation_split = 0.2
+)
+```
+
+```{r}
+x_test <- texts_to_sequences(word_seqs, data_test$text) %>%
+  pad_sequences( maxlen = maxlen)
+
+y_test <- as.matrix(data_test$bot)
+```
+
+Make predictions with data from testset. 
+
+```{r}
+pred <- model %>% predict(x_test)
+format(round(pred, 2), scientific = FALSE)
+```
+
+Evaluate performance. 
+
+```{r}
+model %>% evaluate(x_test, y_test, verbose = 0)
+```
+
+```{r}
+newdf <- data.frame(probabilites = format(round(pred, 2)), bot = data_test$bot)
+newdf
+```
+
+```{r}
+auc_xgb <- xgb_roc$auc
+et_auc <- et_roc$auc
+knn_auc <- knn_roc$auc
+c5_auc <- c5_roc$auc
+glove_auc <- model %>% evaluate(x_test, y_test, verbose = 0)
+```
+
+Final comparison of AUC: Choosing the "winner"
+
+```{r}
+fin_comp <- data.frame(Model = c("XGB", "ExtraTrees", "KNN", "C5.0", "GloVe"), 
+                       AUC = c(auc_xgb, et_auc, knn_auc, c5_auc, glove_auc[2]))
+
+fin_comp %>% arrange(desc(AUC)) 
 ```
 
 
-# Things I am trying out right now (Stacking models)
 
-```{r}
-model_list <- caretList(bot ~ .,
-                        data = model_train,
-                        trControl = ctrl,
-                        metric = "ROC",
-                        methodList = c("C5.0", "gbm"))
-```
 
-```{r}
-glm_ensemble <- caretStack(model_list,
-                           method = "ranger",
-                           trControl = trainControl(
-                              method = "cv",
-                              number = 5,
-                              savePredictions = "final",
-                              verboseIter = TRUE,
-                              classProbs = TRUE,
-                              summaryFunction = twoClassSummary))
-```
 
-```{r}
-glm_ensemble
-coef(glm_ensemble$ens_model$finalModel)
-```
 
-```{r}
-p_ens <- predict(glm_ensemble, newdata = model_test, type = "raw")
-confusionMatrix(p_ens, model_test$bot, mode = "everything", positive = "Yes")
 
-prob_ens <- predict(glm_ensemble, model_test, type = "prob")
 
-prob_et <- predict(et, model_test, type = "prob")
-
-```
 
 
 
