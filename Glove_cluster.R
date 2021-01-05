@@ -1,6 +1,7 @@
 library(keras)
 ## library(tensorflow)
 library(dplyr)
+library(data.table)
 
 ## Should be in private to be reproducible.
 ## setwd("/Users/2egaa/Desktop/nG-BotClassifier")
@@ -33,11 +34,11 @@ data_test <- data_glove[1201:1351,]
 
 ## Run only if pre_trained vectors are not downloaded yet.
 
-{r eval=FALSE, include=FALSE}
-if (!file.exists('glove.6B.zip')) {
-  download.file('http://nlp.stanford.edu/data/glove.6B.zip',destfile = 'glove.6B.zip')
-  unzip('glove.6B.zip')
-}
+## Already there.
+## if (!file.exists('glove.6B.zip')) {
+##     download.file('http://nlp.stanford.edu/data/glove.6B.zip',destfile = 'glove.6B.zip')
+##    unzip('glove.6B.zip')
+## }
 
 
 ## Read in vectors.
@@ -123,11 +124,10 @@ pred <- model %>% predict(x_test)
 format(round(pred, 2), scientific = FALSE)
 
 
-
 model %>% evaluate(x_test, y_test, verbose = 0)
-
 
 
 newdf <- data.frame(probabilites = format(round(pred, 2)), bot = data_test$bot)
 newdf
 
+hhe
