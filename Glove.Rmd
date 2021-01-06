@@ -13,6 +13,7 @@ library(dplyr)
 ```{r}
 setwd("/Users/2egaa/Desktop/nG-BotClassifier")
 data <- read.csv("botornot-1.csv")
+data <- data %>% drop_na(c(overallTime, consentTime, readProfileTime, readEssayTime, speeder))
 ```
 
 Select relevant variables and merge text variables. 
@@ -72,7 +73,7 @@ word_seqs <- text_tokenizer(num_words = max_words) %>%
 
 ```{r}
 x_train <- texts_to_sequences(word_seqs, data_train$text) %>%
-  pad_sequences( maxlen = maxlen)
+  pad_sequences(maxlen = maxlen)
 ```
 
 ```{r}
@@ -89,32 +90,58 @@ dic <- data.frame(word = names(word_indices), key = word_indices, stringsAsFacto
 word_embeds <- dic  %>% left_join(vectors) %>% .[,3:302] %>% replace(., is.na(.), 0) %>% as.matrix()
 ```
 
+Create object with meta features and transform it into matrix. 
+
 ```{r}
-input <- layer_input(shape = list(maxlen), name = "input")
+data_meta <- data %>% select(overallTime, consentTime, readProfileTime, readEssayTime, speeder)
 
-model <- input %>%
-  layer_embedding(input_dim = max_words, output_dim = dim_size, input_length = maxlen,
-                  weights = list(word_embeds), trainable = FALSE) %>%
-  layer_spatial_dropout_1d(rate = 0.2 ) %>%
-  bidirectional(
-    layer_gru(units = 80, return_sequences = TRUE)
-  )
-max_pool <- model %>% layer_global_max_pooling_1d()
-ave_pool <- model %>% layer_global_average_pooling_1d()
+data_meta <- as.matrix(data_meta)
+```
 
-output = layer_concatenate(list(ave_pool, max_pool)) %>%
-  layer_dense(units = 1, activation = "sigmoid")
+```{r}
+# Define layer for GloVe
+main_input <- layer_input(shape = list(maxlen), name = "input")
 
-model <- keras_model(input, output)
+lstm_out <- main_input %>%
+         layer_embedding(input_dim = max_words, 
+                         output_dim = dim_size, 
+                         input_length = maxlen, 
+                         weights = list(word_embeds), trainable = FALSE) %>%
+         layer_spatial_dropout_1d(rate = 0.2 ) %>%
+         bidirectional(layer_gru(units = 80, return_sequences = TRUE))
 
+
+auxiliary_output <- lstm_out %>%
+                    layer_dense(units = 5, 
+                                activation = 'sigmoid', 
+                                name = 'aux_output')
+
+# Create second layer for the meta data 
+auxiliary_input <- layer_input(shape = list(maxlen), 
+                               name = "aux_input")
+  
+# "Stack" both layers on top of each other
+main_output <- layer_concatenate(c(lstm_out, auxiliary_input)) %>%
+         layer_dense(units = 64, activation = 'relu') %>%
+         layer_dense(units = 64, activation = 'relu') %>%
+         layer_dense(units = 64, activation = 'relu') %>%
+         layer_dense(units = 5, activation = 'sigmoid', name = 'main_output')
+
+# Define model with two in- and outputs
+model <- keras_model(inputs = c(x_train, test), 
+                     outputs = c(output, auxiliary_output ))
+
+# Compile model
 model %>% compile(
   optimizer = "adam",
   loss = "binary_crossentropy",
   metrics = tensorflow::tf$keras$metrics$AUC()
 )
 
+# Train model with the two different layers
 history <- model %>% keras::fit(
-  x_train, y_train,
+  x = list(main_input = x_train, aux_input = data_meta),
+  y = list(main_output = y_train, aux_output = y_train))
   epochs = 16,
   batch_size = 32,
   validation_split = 0.2
